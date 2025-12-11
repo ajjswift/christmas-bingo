@@ -159,29 +159,49 @@ export function ChristmasBingo() {
 
     // Connect to WebSocket
     useEffect(() => {
-        const ws = new WebSocket("ws://localhost:8080");
+        let ws;
 
-        ws.onopen = () => console.log("Connected to WebSocket 🎅");
-        ws.onclose = () => console.log("Disconnected from WebSocket 🧊");
-
-        ws.onmessage = (event) => {
+        async function connect() {
             try {
-                const msg = JSON.parse(event.data);
-                if (msg.type === "update") {
-                    const { calledNumbers, currentNumber, isGameOver } =
-                        msg.payload;
-                    setCalledNumbers(calledNumbers);
-                    setCurrentNumber(currentNumber);
-                    setIsGameOver(isGameOver);
-                }
-            } catch (e) {
-                console.error("Invalid message from server", e);
-            }
-        };
+                const res = await fetch("/api/env/get_websocket");
+                const data = await res.json();
 
-        setSocket(ws);
+                if (!data.wsUrl) {
+                    throw new Error("Missing wsUrl from API");
+                }
+
+                // Use the URL from the API
+                ws = new WebSocket(data.wsUrl);
+
+                ws.onopen = () => console.log("Connected to WebSocket 🎅");
+                ws.onclose = () =>
+                    console.log("Disconnected from WebSocket 🧊");
+
+                ws.onmessage = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        if (msg.type === "update") {
+                            const { calledNumbers, currentNumber, isGameOver } =
+                                msg.payload;
+                            setCalledNumbers(calledNumbers);
+                            setCurrentNumber(currentNumber);
+                            setIsGameOver(isGameOver);
+                        }
+                    } catch (e) {
+                        console.error("Invalid message from server", e);
+                    }
+                };
+
+                setSocket(ws);
+            } catch (err) {
+                console.error("Failed to fetch or connect to WebSocket:", err);
+            }
+        }
+
+        connect();
+
         return () => {
-            ws.close();
+            if (ws) ws.close();
         };
     }, []);
 
